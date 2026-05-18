@@ -162,8 +162,12 @@ export class ScheduleService {
   }): Date[] {
     const [hh, mm] = opts.time.split(':').map(Number);
     const out: Date[] = [];
-    let cur = new Date(opts.startDate);
-    cur.setHours(hh, mm, 0, 0);
+    // IMPORTANT: parse startDate como LOCAL, não UTC.
+    // `new Date("2026-05-19")` é UTC midnight → em fusos negativos vira o dia
+    // anterior à noite. Construir com componentes explícitos evita isso.
+    const dateOnly = opts.startDate.slice(0, 10);
+    const [y, mo, d] = dateOnly.split('-').map(Number);
+    let cur = new Date(y, mo - 1, d, hh, mm, 0, 0);
 
     while (out.length < opts.n) {
       if (opts.skipWeekends) {

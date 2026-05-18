@@ -1,425 +1,192 @@
-# Checklist de Validação — v1
+# Checklist de Validação — v1 (rodada 2)
 
-> Roteiro manual para validar o sistema ponta-a-ponta. Marque `[x]` conforme valida.
-> Tempo estimado: **45–60 minutos**. Custo de IA estimado: **~US$ 0,15**.
+> Roteiro **somente do que falta validar** após a 1ª rodada. As seções que
+> passaram limpas (auth, sites, ideias, prompts, playground, custos, expansão,
+> regerar campo, revisão, despublicar) foram removidas.
+> Itens marcados com 🔧 **foram corrigidos** desde a 1ª rodada e precisam re-teste.
+> Custo de IA estimado nesta rodada: **~US$ 0,05** (1 expansão + 1 cover).
 
----
-
-## 0. Pré-requisitos `[ ]`
-
-- [x] Docker Desktop rodando.
-- [x] Portas livres: **3000** (admin), **3001** (LP), **3333** (API), **5432** (Postgres), **6379** (Redis).
-- [x] Você tem a chave do OpenRouter em `seo-blog-backend/.env` (`OPEN_ROUTER_KEY=sk-or-v1-...`).
-
-### 0.1 Subir tudo
+## Como atualizar antes de começar
 
 ```bash
-# Em 3 terminais separados:
+# 1. Pull dos 3 repos
+cd seo-blog-backend  && git pull
+cd ../seo-blog-frontend && git pull
+cd ../health-voice/health-voice-institutional-v2 && git pull
 
-# Terminal 1 — Postgres + Redis
-cd seo-blog-backend
-docker compose up -d
-# verificar: docker ps deve mostrar 2 containers "healthy"
-
-# Terminal 2 — Backend
-cd seo-blog-backend
-npm install      # se ainda não instalou
-npx prisma migrate dev   # aplica migrations
-npm run db:seed          # cria admin@seoblog.local / 123456 + Health Voice
-npm run start:dev
-# esperar log "running on http://localhost:3333"
-
-# Terminal 3 — Frontend admin
-cd seo-blog-frontend
-npm install
-npm run dev
-# esperar "Ready in ..."
-
-# Terminal 4 (opcional, para testar a LP)
-cd health-voice/health-voice-institutional-v2
-git checkout feat/seo-blog-integration
-cp .env.local.example .env.local   # se ainda não tem
-npm install
-npm run dev
-# vai pegar a porta 3001
+# 2. Reiniciar dev servers (containers Docker já estão de pé)
+cd ../../seo-blog-backend  && npm run start:dev   # terminal 1
+cd ../seo-blog-frontend    && npm run dev          # terminal 2
+cd ../health-voice/health-voice-institutional-v2 && npm run dev   # terminal 3 (LP)
 ```
 
-**Validar:**
-- [x] `curl http://localhost:3333/health` retorna `{"status":"ok","services":{"db":"up"}}`.
-- [x] http://localhost:3000 carrega.
-- [x] http://localhost:3001 carrega (LP, opcional).
+---
+
+## 🔧 A. Re-testes (bugs corrigidos)
+
+### A.1 SiteSwitcher aparece no 1º login `[ ]` 🔧
+Fix: `AuthProvider` invalida queries pós-login.
+- [ ] Logout. Login de novo com `admin@seoblog.local` / `123456`.
+- [ ] **Sem F5**, o SiteSwitcher no topbar deve mostrar "Health Voice".
+- [ ] Cards do dashboard preenchidos.
+
+### A.2 Tabela de preview do BulkImport `[ ]` 🔧
+Fix: dialog `max-w-6xl` + colunas com `min-width` específico.
+- [ ] `/ideias` → "Importar em lote" → aba "Colar" → colar 3 linhas → pré-visualizar.
+- [ ] Inputs de Título e Briefing mostram texto completo (não 2 caracteres).
+
+### A.3 Editor: campos persistem ao trocar de aba `[ ]` 🔧
+Fix: `useRef` trava inicialização do form por `content.id`. Refetches do React Query não resetam mais.
+- [ ] Abrir um conteúdo no `/conteudos/[id]`.
+- [ ] Trocar entre as abas Conteúdo / SEO + Preview / Mídia / Links Internos / Histórico — todas as 4-5 vezes.
+- [ ] Voltar pra Conteúdo: título, slug, corpo, etc. continuam preenchidos.
+- [ ] SEO + Preview: meta description e excerpt continuam preenchidos.
+- [ ] Mídia: capa continua aparecendo.
+
+### A.4 Histórico atualiza após regerar campo `[ ]` 🔧
+Fix: RegenerateButton invalida `['content-versions']`.
+- [ ] No editor, clicar **Regerar** em Meta Description.
+- [ ] Header mostra `v2` imediatamente.
+- [ ] Ir para aba Histórico **sem sair da página** — deve mostrar 2 linhas (v1, v2).
+- [ ] Comparar v1 → v2 mostra mudança só em `metaDescription`.
+
+### A.5 Seletor de status com feedback `[ ]` 🔧
+Fix: toast inline verde no sucesso + vermelho com mensagem no erro. Dropdown desabilita durante a transição.
+- [ ] Editor de um conteúdo APPROVED.
+- [ ] No dropdown, escolher "→ Publicado" → aparece toast verde **"✓ Status → Publicado"** por ~2.5s; badge muda; dropdown volta a "Mover status…".
+- [ ] Tentar uma transição inválida (ex.: PUBLISHED → EXPANDED) → toast vermelho **"⚠ Invalid transition: …"** por ~4s.
+- [ ] Durante a chamada, dropdown mostra "Mudando status…" e fica desabilitado.
+
+### A.6 Prompt customizado com variáveis em PT funciona `[ ]` 🔧
+Fix: aliases no `PromptEngine` — `{{titulo}}` resolve como `{{title}}`, `{{tema}}` idem, `{{palavras-chave}}` como `{{keywords}}`.
+- [ ] Manter (ou recriar) um prompt TITLE com `User: Tema: {{titulo}}\nKeywords: {{keywords}}\nGere 1 título.`
+- [ ] Expandir uma ideia **"Hipertensão arterial em idosos"**.
+- [ ] Validar: título gerado é sobre hipertensão (não sobre criar site). Custo ~US$ 0.10.
+- [ ] Backend não deve logar `prisma:error` durante a expansão.
+
+### A.7 Backend sem `prisma:error` ao mover status `[ ]` 🔧
+Fix: `transition()` incrementa `version` → snapshot único por transição.
+- [ ] Salvar manualmente um campo no editor (criando v2 via save).
+- [ ] Mudar status pelo dropdown → ver no terminal do backend: **nenhum `prisma:error`** sobre `Unique constraint failed on the fields (content_id, version)`.
+
+### A.8 Timezone: agendar no dia certo `[ ]` 🔧
+Fix: backend e frontend agora parseiam `startDate` como LOCAL (não UTC).
+- [ ] `/calendario` → "Agendar em lote" → data = **amanhã**, hora = `09:00`, modo DAILY.
+- [ ] Pré-visualização do dialog mostra a data correta de amanhã.
+- [ ] Confirmar. No calendário, o ponto deve cair em **amanhã**, não hoje.
+- [ ] Reagendar clicando no ícone: o prompt agora mostra **horário local** (ex.: `2026-05-19T09:00`), não UTC.
+- [ ] Editar para `2026-05-20T15:30` e confirmar → calendário move o job para o dia 20 às 15:30.
 
 ---
 
-## 1. Auth + Navegação `[ ]`
+## ⏳ B. Cenários ainda não testados
 
-- [x] Acessar http://localhost:3000 → redireciona para `/login`.
-- [x] Login com `admin@seoblog.local` / `123456` → redireciona para `/dashboard`.
-- [x] **Dashboard** mostra cards zerados/baixos (nenhum conteúdo ainda).
-- [x] Sidebar tem 11 itens: Dashboard, Ideias, Conteúdos, Revisão, Calendário, Publicações, Prompts, Custos IA, Sites, Tipos de Conteúdo, Usuários.
-- [?] **SiteSwitcher** no topbar mostra "Health Voice".
-- [x] Logout → volta pra `/login`.
-- [x] Login com senha errada → mensagem de erro, **não** muda página.
+### B.1 Agendar: cancelar e voltar pra APPROVED `[ ]`
+- [ ] No `/calendario`, clicar 🗑 num job PENDING.
+- [ ] Confirmar. Status do job vira **CANCELLED** na lista.
+- [ ] Em `/conteudos`, esse conteúdo voltou de SCHEDULED para **APPROVED**.
 
-*Anotações:* Eu realizei o primeiro login e estava tudo zerado, e também sem o site switcher no header; ao atualizar a página, o seletor apareceu com Health Voice selecionado e alguns dados preenchidos dos testes automatizados realizados acredito.
+### B.2 Publish-now (publicação manual instantânea) `[ ]`
+- [ ] Editor de um APPROVED → botão **"Publicar agora"** (aparece só em APPROVED/UNPUBLISHED).
+- [ ] Confirma → alerta "Publicação enfileirada".
+- [ ] Em <5s, recarregar o editor → status = **PUBLISHED**.
+- [ ] `/publicacoes` mostra job SUCCEEDED com `attempts=1`.
 
-### 1.1 Rate limit no login
+### B.3 Schedule com delay curto (worker BullMQ) `[ ]`
+- [ ] Garantir 1 conteúdo APPROVED.
+- [ ] `/calendario` → "Agendar em lote" com data = **hoje** e hora = **3 min no futuro** (ex.: agora são 14:10 → marcar 14:13).
+- [ ] Voltar à página em ~3 min: status do Content é **PUBLISHED**.
+- [ ] `/publicacoes` tem um job SUCCEEDED novo.
 
-- [x] Tente fazer login com senha errada **6 vezes seguidas** rapidamente.
-- [x] **6ª tentativa retorna erro 429 (Too Many Requests)**. Esperar 1min libera.
-
----
-
-## 2. Sites & Configurações `[ ]`
-
-### 2.1 Listar
-- [x] `/sites` mostra "Health Voice" com 2 content types.
-- [x] `/content-types` mostra `Blog` (/blog) e `Notícia` (/noticias) ativos.
-
-### 2.2 Criar
-- [x] `/sites` → "Novo site" → preencher um teste (slug `teste-cms`, nome qualquer) → criar.
-- [x] Aparece na lista. **SiteSwitcher** mostra opção do novo site.
-- [x] Trocar para o site teste no switcher → `/content-types` fica vazio.
-- [x] Voltar para Health Voice e **deletar** o site teste.
-
-### 2.3 Usuários
-- [x] `/users` lista 1 admin.
-- [x] Criar um usuário EDITOR (email qualquer, senha 6 chars).
-- [x] Logout, login como o novo EDITOR. `/users` **não aparece** na sidebar.
-- [x] Voltar a logar como admin e deletar o EDITOR.
-
----
-
-## 3. Ideias — Importação `[ ]`
-
-Navegar para `/ideias` (Health Voice no SiteSwitcher).
-
-### 3.1 Bulk import (4 formatos)
-
-Clicar **"Importar em lote"**.
-
-**Aba "Colar (1/linha)"** — colar:
-```
-Sintomas iniciais de diabetes tipo 2
-Prevenção de AVC após os 50
-Hipertensão arterial em idosos
-```
-- [x] Selecionar Content Type = Blog.
-- [x] Pré-visualizar → tabela com 3 linhas editáveis.
-- [x] Importar → alerta "3 ideias importadas".
-- [x] Lista atualiza, todas com status **PENDING**.
-
-**Aba CSV** — colar:
-```
-title,briefing,keywords
-"Glicemia em jejum","O que é e como medir","glicemia;jejum;diabetes"
-"Colesterol LDL alto","Quando tratar","ldl;colesterol;cardiologia"
-```
-- [x] Pré-visualizar → 2 linhas com keywords parseadas.
-- [x] Importar → 2 ideias novas.
-
-**Aba JSON** — colar:
-```json
-[
-  { "titleSeed": "Insônia em pacientes idosos", "briefing": "Causas e tratamento", "keywords": ["sono","idosos"] }
-]
-```
-- [x] Importar → 1 ideia nova.
-
-**Aba Markdown** — colar:
-```
-- Saúde mental no consultório
-* Burnout em médicos
-1. Telemedicina pós-pandemia
-```
-- [x] Importar → 3 ideias.
-
-*Anotações:* A tabela de pré-visualização está muito pequena, os inputs de título só mostram 2 caracteres.
-
-**Total esperado: 9 ideias PENDING.**
-
-### 3.2 Bulk actions
-- [x] Selecionar 2 ideias via checkbox → ações em massa aparecem.
-- [x] "Mudar status" → DISCARDED → 2 ideias agora DISCARDED. Filtrar por status confirma.
-- [x] Apagar bulk de 1 ideia funciona.
-
-### 3.3 Filtros e busca
-- [x] Filtro status = PENDING mostra só pendentes.
-- [x] Buscar "diabetes" filtra por título/briefing/keyword.
-
----
-
-## 4. Prompts & Playground `[ ]` ⚠️ ESSE COBRA
-
-### 4.1 Listar
-- [?] `/prompts` → vazia (Health Voice ainda sem prompts customizados — a IA usa defaults da casa).
-
-*Anotações:* Já possui um prompt para o campo "Título" com `google/gemini-2.5-flash`.
-
-### 4.2 Criar um prompt
-- [x] Clicar "Novo prompt":
-  - Tipo: qualquer / Campo: TITLE / Modelo: `google/gemini-2.5-flash` / temp 0.5
-  - System: "Você gera títulos curtos em pt-BR. SEM aspas."
-  - User: `Tema: {{title}}\nKeywords: {{keywords}}\nGere 1 título de até 60 caracteres.`
-- [x] Salva. Aparece na tabela.
-
-### 4.3 Playground (⚠️ **1 chamada paga — ~US$ 0,0001**)
-- [x] Clicar ▶ no prompt.
-- [x] Dialog detecta variáveis `title` e `keywords`, gera campos.
-- [x] Preencher: title = "Pressão alta em idosos", keywords = "hipertensão, idosos".
-- [x] Aviso amarelo de custo aparece.
-- [x] Clicar **Rodar** → resposta em <5s.
-- [x] Aparece: texto gerado, tokens in/out, custo, tempo.
-- [x] Clicar **Rodar de novo** → aparece "HIT" no badge de cache, custo 0.
-
-### 4.4 Custos
-- [?] `/custos` mostra 1 chamada registrada.
-- [x] Gráfico por dia mostra uma barra.
-- [x] Botão **Download CSV** baixa `ai-cost-30d.csv` com 1+ linhas.
-
-*Anotações:* Várias chamadas dos testes automatizados imagino.
-
----
-
-## 5. Expansão (Pipeline IA) `[ ]` ⚠️ **CUSTA ~US$ 0,10**
-
-Na página `/ideias`:
-
-- [x] Escolher uma ideia PENDING (ex.: "Hipertensão arterial em idosos").
-- [x] Clicar ⚡ (Sparkles). Aparece alerta de confirmação com **estimativa de custo**.
-- [x] Confirmar. Espera ~60–90s.
-- [x] Redireciona automaticamente para `/conteudos/<id>` (editor).
-
-**Validar no editor:**
-- [x] **Aba Conteúdo:** título reescrito, slug em kebab-case sem stopwords, corpo Markdown com >800 palavras (contador embaixo do textarea), botões "Regerar" por campo.
-- [x] **Aba SEO + Preview:** meta description, excerpt, JSON-LD válido. Cards de preview Google/OG/Twitter renderizam.
-- [x] **Aba Mídia:** capa PNG gerada (1MP, ~$0.04). Botão "Gerar via IA" pode regenerar.
-- [x] **Aba Links Internos:** vazio agora (precisa de outros posts pra calcular).
-- [x] **Aba Histórico:** 1 versão (v1) registrada. Mudou: `title, slug, bodyMd, …`.
-- [?] Status do conteúdo = **EXPANDED**.
-
-*Anotações:* Vou parar aqui, pois criou-se um conteúdo com o título "Tema: Como criar um siteKeywords: site, criar, fazer, web, internet, onlineCrie seu site: Guia completo para iniciantes".
-
-*Anotações 2:* Todos os campos vieram preenchidos corretamente, mas ao ir movendo de aba por aba, da aba "Conteúdo", o corpo ficou extremamente simples, da aba "SEO + Preview", os campos "Meta description", "Excerpt", "JSON-LD" ficaram vazios, a "Mídia/Capa" ficou vazia. O seletor de status está vazio, e eu não consigo alterar para "EXPANDED", por exemplo.
-
-### 5.1 Regerar campo individual
-- [x] Clicar "Regerar" no campo Meta Description.
-- [x] Aparece nova meta. Versão incrementa para v2 no Histórico.
-- [x] **VersionDiff:** ir na aba Histórico, selecionar v1 → v2 — só mostra mudança em `metaDescription`.
-
-*Anotações:* Fiz a regeração do Meta description, mudou a versão no header, mas no histórico continua apenas 1. Voltei para a lista de Conteúdos e lá já consta v2, abrindo os detalhes aparece a mudança no histórico.
-
-**Voltar para `/ideias`** — a ideia agora aparece como EXPANDED.
-
----
-
-## 6. Workflow de Revisão `[ ]`
-
-### 6.1 Fila de revisão
-- [x] `/revisao` mostra o conteúdo expandido com badge EXPANDED.
-- [x] Clicar **Aprovar**. Status muda para APPROVED. Card desaparece.
-
-### 6.2 Transições inválidas (testar via UI)
-- [x] Abrir `/conteudos/<id>`.
-- [?] No dropdown "Mover status" tentar voltar para EXPANDED → erro 400 ("Invalid transition").
-- [x] Tentar ir direto para PUBLISHED → funciona (ADMIN tem permissão).
-
-*Anotações:* O seletor de status está estranho, eu consigo selecionar algum status mas não tem nenhum feedback, nenhum toast, o dropdown não muda, fica sempre "Mover status...".
-
-### 6.3 Despublicar
-- [x] Mover status para UNPUBLISHED.
-- [x] Acessar `http://localhost:3333/public/health-voice/contents/<slug>` → **410 Gone**.
-- [x] Voltar para PUBLISHED via dropdown (UNPUBLISHED → PUBLISHED é permitido só para ADMIN).
-- [x] Endpoint volta a retornar 200.
-
----
-
-## 7. Agendamento `[ ]`
-
-Pré-requisito: ter ≥1 conteúdo em status **APPROVED** (volte um pra APPROVED se todos estão PUBLISHED).
-
-### 7.1 Single schedule
-- [ ] No editor de um APPROVED, mover status → "Mover para SCHEDULED" não é manual; use o calendário.
-- [ ] Atalho: usar `POST /schedule` via Scalar (http://localhost:3333/reference) ou esperar o teste 7.2.
-
-### 7.2 Bulk schedule
-- [ ] `/calendario` → botão **"Agendar em lote"**.
-- [ ] Painel: selecionar o conteúdo APPROVED disponível, data inicial = hoje, hora 09:00, modo DAILY, skip weekends.
-- [ ] Pré-visualização mostra a(s) data(s).
-- [ ] Confirmar → "1 agendado".
-- [ ] No calendário, ponto amarelo aparece na data marcada (status PENDING).
-- [ ] Lista embaixo mostra o job com status **PENDING**.
-
-### 7.3 Reagendar e cancelar
-- [ ] Clicar no ícone de reagendar (ExternalLink) → prompt aceita data ISO; mudar para amanhã.
-- [ ] Confirmar → data atualiza no calendário.
-- [ ] Clicar 🗑 → cancelar. Status muda para **CANCELLED**.
-- [ ] O conteúdo correspondente voltou para APPROVED (verificar em `/conteudos`).
-
----
-
-## 8. Worker de Publicação `[ ]`
-
-### 8.1 Publish-now (manual, instantâneo)
-- [ ] No editor de um conteúdo APPROVED, clicar **"Publicar agora"**.
-- [ ] Alert "Publicação enfileirada".
-- [ ] Aguardar ~3s. Recarregar o editor → status = **PUBLISHED**, `publishedAt` preenchido.
-- [ ] `/publicacoes` mostra job SUCCEEDED com attempts=1.
-
-### 8.2 Schedule com delay curto (worker BullMQ)
-Pré-requisito: ter outro conteúdo APPROVED.
-- [ ] `/calendario` → agendar em lote, data = hoje, hora = **3 minutos no futuro** (formato HH:MM).
-- [ ] Aguardar 3 minutos. Atualizar `/conteudos` → status mudou para PUBLISHED automaticamente.
-- [ ] `/publicacoes` mostra novo job SUCCEEDED.
-
-### 8.3 Retry
-- [ ] (Difícil simular falha real) Se houver job FAILED na lista, botão **Retry** aparece e reenfileira.
-
----
-
-## 9. API Pública (consumida pelas LPs) `[ ]`
-
-Sem token (rotas `@IsPublic`):
-
-- [ ] `curl http://localhost:3333/public/health-voice/contents` → JSON com array de posts PUBLISHED.
-- [ ] `curl http://localhost:3333/public/health-voice/contents/<slug>` → detalhe do post.
+### B.4 API pública (consumida pelas LPs) `[ ]`
+Tudo via `curl` (sem token):
+- [ ] `curl http://localhost:3333/public/health-voice/contents` → JSON com array de PUBLISHED.
+- [ ] `curl http://localhost:3333/public/health-voice/contents/<slug-real>` → detalhe completo.
 - [ ] `curl http://localhost:3333/public/health-voice/contents/abc-nao-existe` → **404**.
-- [ ] `curl http://localhost:3333/public/abc-xyz/contents` (site inexistente) → **404**.
-- [ ] `curl http://localhost:3333/public/health-voice/sitemap.xml` → XML válido com `<urlset>` e `<xhtml:link hreflang>`.
-- [ ] `curl http://localhost:3333/public/health-voice/rss.xml` → RSS 2.0 com items e pubDate.
+- [ ] `curl http://localhost:3333/public/site-x/contents` (site inexistente) → **404**.
+- [ ] `curl http://localhost:3333/public/health-voice/sitemap.xml` → XML válido (`<urlset>` + `<xhtml:link hreflang>`).
+- [ ] `curl http://localhost:3333/public/health-voice/rss.xml` → RSS 2.0 com items e `<pubDate>`.
 - [ ] `curl http://localhost:3333/public/health-voice/robots.txt` → texto plano com `Sitemap:`.
-- [ ] Despublicar um post (`UNPUBLISHED`) → o `GET /contents/:slug` agora retorna **410 Gone**.
+- [ ] Despublicar um post (UNPUBLISHED) → `GET /contents/<slug>` retorna **410 Gone**.
 
----
+### B.5 LP integrada (`/blog` em http://localhost:3001) `[ ]`
+**Pré-requisito:** ter pelo menos 1 post PUBLISHED e a LP rodando.
+- [ ] `http://localhost:3001/blog` → grade com posts (capa, categoria, título, meta, data).
+- [ ] Paginação se houver >12 posts.
+- [ ] Clicar num card → `/blog/<slug>` carrega com: hero, capa, corpo Markdown, tags+categoria no rodapé, seção "Posts relacionados" (se houver).
+- [ ] **Ver source (Ctrl+U) do detalhe:**
+  - `<title>` correto
+  - `<meta name="description">` correto
+  - `<meta property="og:title">`, `og:image`
+  - `<script type="application/ld+json">` com BlogPosting
+- [ ] `http://localhost:3001/sitemap.xml` inclui URLs estáticas **+** `/blog/*` (do CMS).
+- [ ] `http://localhost:3001/rss.xml` retorna 200 com RSS válido.
 
-## 10. LP Integrada — health-voice-institutional-v2 `[ ]`
+### B.6 Webhook de revalidate ponta-a-ponta `[ ]`
+- [ ] No painel admin: `/sites` → editar Health Voice → setar `Revalidate URL = http://localhost:3001/api/revalidate` e `Revalidate Secret = change-me-must-match-cms`.
+- [ ] No editor de um conteúdo APPROVED, clicar **Publicar agora**.
+- [ ] No terminal da LP, ver log `POST /api/revalidate 200`.
+- [ ] Recarregar `http://localhost:3001/blog/<slug-novo>` — deve aparecer já (sem esperar ISR de 1h).
+- [ ] **Secret errado:** mudar secret no painel para outro valor, publicar de novo. Backend deve logar warning de **401 no webhook**, mas a publicação no CMS acontece mesmo assim. Voltar o secret.
 
-**Pré-requisito:** LP rodando em http://localhost:3001 (terminal 4 do setup).
-
-### 10.1 Blog na LP
-- [ ] `http://localhost:3001/blog` → grade com os posts publicados.
-- [ ] Cards mostram capa, categoria, título, meta, data.
-- [ ] Paginação aparece se >12 posts.
-- [ ] Clicar num card → `/blog/<slug>` carrega:
-  - [ ] Hero com título grande
-  - [ ] Capa
-  - [ ] Corpo markdown renderizado (H2/H3, listas, parágrafos, código)
-  - [ ] Tags + categoria no fim
-  - [ ] Seção "Posts relacionados" (se houver)
-- [ ] Ver source da página (Ctrl+U):
-  - [ ] `<title>` correto
-  - [ ] `<meta name="description">` correto
-  - [ ] `<meta property="og:title">`, `og:image` etc.
-  - [ ] `<script type="application/ld+json">` com BlogPosting
-
-### 10.2 Sitemap + RSS na LP
-- [ ] `http://localhost:3001/sitemap.xml` → inclui URLs estáticas + entradas `/blog/*`.
-- [ ] `http://localhost:3001/rss.xml` → RSS proxy do backend (200).
-
-### 10.3 Webhook de revalidate (ponta-a-ponta)
-- [ ] No painel admin, abrir `/sites` → editar Health Voice → setar:
-  - **Revalidate URL** = `http://localhost:3001/api/revalidate`
-  - **Revalidate Secret** = `change-me-must-match-cms`
-- [ ] Em qualquer conteúdo APPROVED, clicar "Publicar agora".
-- [ ] No terminal da LP, ver log de `POST /api/revalidate 200`.
-- [ ] Recarregar `http://localhost:3001/blog/<novo-slug>` → aparece sem ter que esperar 1h de ISR.
-
-### 10.4 Webhook secret errado
-- [ ] No site, mudar o secret para algo diferente. Publicar de novo.
-- [ ] Backend tenta chamar a LP → recebe 401, log de warning. **Publicação no DB acontece mesmo assim**.
-- [ ] Voltar o secret correto.
-
----
-
-## 11. Dashboard & Métricas `[ ]`
-
+### B.7 Dashboard agregado `[ ]`
 Voltar para `/dashboard`:
-
-- [ ] **Cards principais** atualizados:
-  - Ideias pendentes (depende do que sobrou)
-  - Aguardando revisão (deve ser 0 se você aprovou tudo)
-  - Agendados próximos 7 dias
-  - Publicados últimos 30 dias = pelo menos 1
-- [ ] **Custo IA hoje** > 0 (você gastou na expansão).
+- [ ] 4 cards principais com números reais (ideias pendentes, aguardando revisão, agendados próx 7d, publicados 30d).
+- [ ] **Custo IA hoje** > 0.
 - [ ] **Success rate** = 100% (todos os jobs OK).
-- [ ] **Pipeline:** DRAFT 0 / EXPANDED 0 / APPROVED 0 / PUBLISHED ≥1.
-- [ ] **Gráfico publicações por dia** mostra barra verde de hoje.
-- [ ] Refetch a cada 30s.
+- [ ] **Pipeline**: contagem por status faz sentido.
+- [ ] **Gráfico publicações por dia** mostra barra verde em hoje.
+- [ ] Refetch a cada 30s (deixa aberto, faça uma publicação em outra aba, volta — cards atualizam).
 
-### 11.1 CSV
-- [ ] `/custos` → botão **CSV**.
-- [ ] Baixa `ai-cost-30d.csv`. Abrir: header + linhas com timestamp, modelo, tokens, custo.
+### B.8 Custos: download CSV `[ ]`
+- [ ] `/custos` → botão **CSV** baixa `ai-cost-30d.csv`.
+- [ ] Arquivo tem header `created_at,site_id,content_id,kind,model,...` + linhas com dados reais.
 
----
+### B.9 Linkagem interna (related posts) `[ ]`
+Pré-requisito: ≥2 posts PUBLISHED no mesmo site com pelo menos 1 tag em comum.
+- [ ] Editor de um post → aba **Links Internos** mostra cards com score, badges de tag/categoria compartilhada.
+- [ ] `curl http://localhost:3333/public/health-voice/contents/<slug>/related` → array com os mesmos posts.
+- [ ] Em `http://localhost:3001/blog/<slug>` deve aparecer a seção "Posts relacionados" no fim.
 
-## 12. Linkagem Interna (Related Posts) `[ ]`
+### B.10 Hardening — uploads `[ ]`
+Via Scalar (http://localhost:3333/reference) → `POST /media/upload`:
+- [ ] Mandar payload com `mimeType: "application/pdf"` → **415 Unsupported Media Type**.
+- [ ] Mandar payload com `base64` de uma imagem **>5MB** (pode gerar com `dd if=/dev/zero bs=1M count=6 | base64`) → **413 Payload Too Large**.
 
-Pré-requisito: ter ≥2 posts PUBLISHED com tags compartilhadas.
-
-- [ ] Abrir um post no editor → aba **Links Internos**.
-- [ ] Mostra cards de relacionados com score, tags compartilhadas em badge.
-- [ ] `curl http://localhost:3333/public/health-voice/contents/<slug>/related` retorna array com os mesmos.
-- [ ] LP em `/blog/<slug>` mostra a seção "Posts relacionados" no fim.
-
----
-
-## 13. Hardening — Limites `[ ]`
-
-### 13.1 Rate limit /ai/preview
-- [ ] No playground, clicar **Rodar** **31× em 1 minuto**.
-- [ ] **32ª request retorna 429.** (Difícil exercitar manualmente; alternativa é o teste 1.1 que já cobre o padrão.)
-
-### 13.2 Upload de imagem grande
-- [ ] No backend `/media/upload` (via Scalar), tentar mandar uma imagem **>5MB** em base64.
-- [ ] Resposta: **413 Payload Too Large**.
-
-### 13.3 Upload com MIME proibido
-- [ ] Mandar payload com `mimeType: "application/pdf"`.
-- [ ] Resposta: **415 Unsupported Media Type**.
-
----
-
-## 14. Smoke final — fluxo completo realista `[ ]`
-
-Esse é o "happy path" como o operador faria diariamente:
-
-1. [ ] Importar 5 ideias via Paste.
-2. [ ] Expandir 1 delas (~US$ 0,10).
-3. [ ] Editor: ajustar título manualmente, salvar (versão incrementa).
-4. [ ] Ir em `/revisao` → Aprovar.
-5. [ ] `/calendario` → agendar essa para 5 minutos no futuro.
-6. [ ] Aguardar publicação automática (~5min).
-7. [ ] Conferir em `/conteudos` que está PUBLISHED.
-8. [ ] Acessar `http://localhost:3001/blog/<slug>` — post renderizado com SEO.
+### B.11 Smoke final — fluxo realista `[ ]` ⚠️ ~US$ 0.10
+Esse é o "happy path" do operador:
+1. [ ] Importar 3 ideias via Paste.
+2. [ ] Expandir 1 (esperar ~80s).
+3. [ ] No editor, ajustar manualmente o título → Salvar (v2).
+4. [ ] `/revisao` → Aprovar.
+5. [ ] `/calendario` → agendar para 3 min no futuro.
+6. [ ] Aguardar publicação automática.
+7. [ ] `/conteudos` mostra PUBLISHED.
+8. [ ] `http://localhost:3001/blog/<slug>` carrega com SEO completo.
 9. [ ] `/dashboard` mostra +1 publicado e custo refletido.
 
 ---
 
-## Resumo de custos do checklist completo
+## Anotações da rodada anterior (preservadas para histórico)
 
-| Onde gasta | Aprox |
-|---|---|
-| Playground (1 chamada) | ~$0,0001 |
-| Expansão completa (Fase 5) | ~$0,10 |
-| Regerar Meta Description | ~$0,005 |
-| Regerar TAGS | ~$0,0001 |
-| Tudo somado | **~US$ 0,15** |
+- **3.1 preview pequeno** — corrigido em A.2.
+- **5 título sem sentido** — corrigido em A.6 (aliases `{{titulo}}`).
+- **5 campos sumindo entre abas** — corrigido em A.3.
+- **5.1 histórico não atualizava** — corrigido em A.4.
+- **6.2 seletor de status sem feedback** — corrigido em A.5.
+- **7.2 ponto laranja confuso quando data passou** — comportamento esperado (job já rodou). Sem ação.
+- **7.3 reschedule +3h e dia errado** — corrigido em A.8.
+- **Backend `prisma:error` sobre constraint** — corrigido em A.7.
 
 ---
 
 ## Se algo falhar
 
-Consultar [`RUNBOOK.md`](./RUNBOOK.md) seção "Quando uma publicação falha" + grep nos logs:
-```bash
-# Backend
-docker logs seoblog-postgres --tail 50
-docker logs seoblog-redis --tail 50
+Ver [`RUNBOOK.md`](./RUNBOOK.md) seção "Quando uma publicação falha". Erros mais comuns:
 
-# E os logs do `npm run start:dev` no terminal
-```
-
-Erros comuns:
-- **EADDRINUSE** → outra coisa usando 3000/3001/3333. Matar processo (`PowerShell: (Get-NetTCPConnection -LocalPort 3333).OwningProcess`).
-- **EPERM Prisma** → backend rodando segurando `query_engine.dll`. Stop → regenerate → start.
-- **Supabase URL required na LP** → faltam dummies de Supabase no `.env.local` da LP.
-- **`change-me-must-match-cms`** no secret → ajuste no painel **e** na `.env.local` da LP.
+| Erro | Causa | Ação |
+|---|---|---|
+| `EADDRINUSE :3333` | Backend ainda rodando | `(Get-NetTCPConnection -LocalPort 3333).OwningProcess \| Stop-Process -Force` |
+| `EPERM Prisma` | Backend segurando `query_engine.dll` | Matar processo Node → `npx prisma generate` → restart |
+| `Supabase URL required` na LP | `.env.local` sem dummies | Copiar de `.env.local.example` |
+| Webhook 401 no backend log | Secret divergente CMS ↔ LP | Sincronizar valor em `/sites` e `.env.local` |
