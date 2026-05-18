@@ -1,0 +1,342 @@
+// =====================================================================
+// SEO Blog — schema Fase 1: multi-tenant + auth
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------- Auth ----------------
+
+enum AdminRole {
+  ADMIN
+  EDITOR
+  REVISOR
+}
+
+model AdminUser {
+  id          String    @id @default(uuid()) @db.Uuid
+  email       String    @unique
+  password    String
+  name        String
+  role        AdminRole @default(EDITOR)
+  active      Boolean   @default(true)
+  siteAccess  String[]  @default([]) @map("site_access")
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("admin_users")
+}
+
+// ---------------- Multi-tenant ----------------
+
+model Site {
+  id               String   @id @default(uuid()) @db.Uuid
+  slug             String   @unique
+  name             String
+  domain           String?
+  authorName       String   @map("author_name")
+  toneOfVoice      String   @default("") @map("tone_of_voice")
+  defaultLocale    String   @default("pt-BR") @map("default_locale")
+  supportedLocales String[] @default(["pt-BR"]) @map("supported_locales")
+  ogDefaults       Json     @default("{}") @map("og_defaults")
+  indexnowKey      String?  @map("indexnow_key")
+  revalidateUrl    String?  @map("revalidate_url")
+  revalidateSecret String?  @map("revalidate_secret")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  contentTypes ContentType[]
+
+  @@map("sites")
+}
+
+model ContentType {
+  id          String  @id @default(uuid()) @db.Uuid
+  siteId      String  @map("site_id") @db.Uuid
+  slug        String  // 'blog' | 'noticia' | 'case' | ...
+  name        String
+  routePrefix String  @map("route_prefix") // ex.: '/blog'
+  schemaExtra Json    @default("{}") @map("schema_extra")
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  site     Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  ideas    Idea[]
+  contents Content[]
+
+  @@unique([siteId, slug])
+  @@index([siteId])
+  @@map("content_types")
+}
+
+// ---------------- AI / Prompts (Fase 3) ----------------
+
+enum PromptField {
+  TITLE
+  SLUG
+  BODY
+  META_DESCRIPTION
+  EXCERPT
+  TAGS
+  CATEGORY
+  IMAGE_PROMPT
+  JSON_LD
+  TRANSLATION
+}
+
+model PromptTemplate {
+  id            String      @id @default(uuid()) @db.Uuid
+  siteId        String      @map("site_id") @db.Uuid
+  contentTypeId String?     @map("content_type_id") @db.Uuid
+  field         PromptField
+  locale        String      @default("pt-BR")
+  model         String
+  systemPrompt  String      @default("") @map("system_prompt") @db.Text
+  userPrompt    String      @db.Text @map("user_prompt")
+  temperature   Float       @default(0.7)
+  maxTokens     Int?        @map("max_tokens")
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@unique([siteId, contentTypeId, field, locale])
+  @@index([siteId, field])
+  @@map("prompt_templates")
+}
+
+enum AiUsageKind {
+  TEXT
+  IMAGE
+}
+
+model AiUsageLog {
+  id               String      @id @default(uuid()) @db.Uuid
+  siteId           String?     @map("site_id") @db.Uuid
+  promptTemplateId String?     @map("prompt_template_id") @db.Uuid
+  contentId        String?     @map("content_id") @db.Uuid
+  kind             AiUsageKind @default(TEXT)
+  model            String
+  inputTokens      Int         @default(0) @map("input_tokens")
+  outputTokens     Int         @default(0) @map("output_tokens")
+  costCents        Int         @default(0) @map("cost_cents") // centavos USD (×100, evita float)
+  cached           Boolean     @default(false)
+  durationMs       Int         @default(0) @map("duration_ms")
+  meta             Json        @default("{}")
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  @@index([siteId, createdAt])
+  @@index([model])
+  @@map("ai_usage_log")
+}
+
+// ---------------- Ideas (Fase 2) ----------------
+
+enum IdeaStatus {
+  PENDING
+  EXPANDED
+  DISCARDED
+}
+
+model Idea {
+  id            String     @id @default(uuid()) @db.Uuid
+  siteId        String     @map("site_id") @db.Uuid
+  contentTypeId String     @map("content_type_id") @db.Uuid
+  titleSeed     String     @map("title_seed")
+  briefing      String     @default("")
+  keywords      String[]   @default([])
+  locale        String     @default("pt-BR")
+  status        IdeaStatus @default(PENDING)
+  notes         String     @default("")
+  createdBy     String?    @map("created_by") @db.Uuid
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  contentType ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Restrict)
+  contents    Content[]
+
+  @@index([siteId, status])
+  @@index([siteId, contentTypeId])
+  @@map("ideas")
+}
+
+// ---------------- Contents / Tags / Categories / Media (Fase 4) ----------------
+
+enum ContentStatus {
+  DRAFT
+  EXPANDED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
+}
+
+enum MediaSource {
+  AI
+  UPLOAD
+  EXTERNAL
+}
+
+model MediaAsset {
+  id               String      @id @default(uuid()) @db.Uuid
+  siteId           String      @map("site_id") @db.Uuid
+  url              String
+  storageKey       String?     @map("storage_key")
+  alt              String      @default("")
+  width            Int?
+  height           Int?
+  mimeType         String?     @map("mime_type")
+  sizeBytes        Int?        @map("size_bytes")
+  source           MediaSource @default(UPLOAD)
+  generationPrompt String?     @map("generation_prompt") @db.Text
+  model            String?
+  costCents        Int         @default(0) @map("cost_cents")
+  createdBy        String?     @map("created_by") @db.Uuid
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  ogImageOf Content[] @relation("ContentOgImage")
+
+  @@index([siteId, createdAt])
+  @@map("media_assets")
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  siteId    String   @map("site_id") @db.Uuid
+  slug      String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contents ContentTag[]
+
+  @@unique([siteId, slug])
+  @@map("tags")
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  siteId      String   @map("site_id") @db.Uuid
+  slug        String
+  name        String
+  description String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  contents ContentCategory[]
+
+  @@unique([siteId, slug])
+  @@map("categories")
+}
+
+model Content {
+  id              String        @id @default(uuid()) @db.Uuid
+  ideaId          String?       @map("idea_id") @db.Uuid
+  siteId          String        @map("site_id") @db.Uuid
+  contentTypeId   String        @map("content_type_id") @db.Uuid
+  locale          String        @default("pt-BR")
+  sourceContentId String?       @map("source_content_id") @db.Uuid
+  title           String        @default("")
+  slug            String        @default("")
+  bodyMd          String        @default("") @map("body_md") @db.Text
+  excerpt         String        @default("") @db.Text
+  metaDescription String        @default("") @map("meta_description")
+  ogImageId       String?       @map("og_image_id") @db.Uuid
+  jsonLd          Json          @default("{}") @map("json_ld")
+  status          ContentStatus @default(DRAFT)
+  version         Int           @default(1)
+  publishedAt     DateTime?     @map("published_at")
+  scheduledFor    DateTime?     @map("scheduled_for")
+  createdBy       String?       @map("created_by") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  idea        Idea?             @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  contentType ContentType       @relation(fields: [contentTypeId], references: [id], onDelete: Restrict)
+  ogImage     MediaAsset?       @relation("ContentOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  versions    ContentVersion[]
+  tags        ContentTag[]
+  categories  ContentCategory[]
+  publishJobs PublishJob[]
+
+  @@unique([siteId, slug, locale])
+  @@index([siteId, status])
+  @@index([siteId, contentTypeId, status])
+  @@index([siteId, scheduledFor])
+  @@map("contents")
+}
+
+// ---------------- Schedule (Fase 6) ----------------
+
+enum PublishJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model PublishJob {
+  id           String           @id @default(uuid()) @db.Uuid
+  contentId    String           @map("content_id") @db.Uuid
+  scheduledFor DateTime         @map("scheduled_for")
+  status       PublishJobStatus @default(PENDING)
+  attempts     Int              @default(0)
+  lastError    String?          @map("last_error") @db.Text
+  bullJobId    String?          @map("bull_job_id")
+  startedAt    DateTime?        @map("started_at")
+  finishedAt   DateTime?        @map("finished_at")
+  createdBy    String?          @map("created_by") @db.Uuid
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledFor, status])
+  @@index([contentId])
+  @@map("publish_jobs")
+}
+
+model ContentVersion {
+  id        String   @id @default(uuid()) @db.Uuid
+  contentId String   @map("content_id") @db.Uuid
+  version   Int
+  snapshot  Json
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, version])
+  @@map("content_versions")
+}
+
+model ContentTag {
+  contentId String @map("content_id") @db.Uuid
+  tagId     String @map("tag_id") @db.Uuid
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, tagId])
+  @@map("content_tags")
+}
+
+model ContentCategory {
+  contentId  String @map("content_id") @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+
+  content  Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, categoryId])
+  @@map("content_categories")
+}
