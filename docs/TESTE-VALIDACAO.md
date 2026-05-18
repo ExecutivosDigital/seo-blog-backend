@@ -191,19 +191,23 @@ Na página `/ideias`:
 - [x] Redireciona automaticamente para `/conteudos/<id>` (editor).
 
 **Validar no editor:**
-- [ ] **Aba Conteúdo:** título reescrito, slug em kebab-case sem stopwords, corpo Markdown com >800 palavras (contador embaixo do textarea), botões "Regerar" por campo.
-- [ ] **Aba SEO + Preview:** meta description, excerpt, JSON-LD válido. Cards de preview Google/OG/Twitter renderizam.
-- [ ] **Aba Mídia:** capa PNG gerada (1MP, ~$0.04). Botão "Gerar via IA" pode regenerar.
-- [ ] **Aba Links Internos:** vazio agora (precisa de outros posts pra calcular).
-- [ ] **Aba Histórico:** 1 versão (v1) registrada. Mudou: `title, slug, bodyMd, …`.
-- [ ] Status do conteúdo = **EXPANDED**.
+- [x] **Aba Conteúdo:** título reescrito, slug em kebab-case sem stopwords, corpo Markdown com >800 palavras (contador embaixo do textarea), botões "Regerar" por campo.
+- [x] **Aba SEO + Preview:** meta description, excerpt, JSON-LD válido. Cards de preview Google/OG/Twitter renderizam.
+- [x] **Aba Mídia:** capa PNG gerada (1MP, ~$0.04). Botão "Gerar via IA" pode regenerar.
+- [x] **Aba Links Internos:** vazio agora (precisa de outros posts pra calcular).
+- [x] **Aba Histórico:** 1 versão (v1) registrada. Mudou: `title, slug, bodyMd, …`.
+- [?] Status do conteúdo = **EXPANDED**.
 
 *Anotações:* Vou parar aqui, pois criou-se um conteúdo com o título "Tema: Como criar um siteKeywords: site, criar, fazer, web, internet, onlineCrie seu site: Guia completo para iniciantes".
 
+*Anotações 2:* Todos os campos vieram preenchidos corretamente, mas ao ir movendo de aba por aba, da aba "Conteúdo", o corpo ficou extremamente simples, da aba "SEO + Preview", os campos "Meta description", "Excerpt", "JSON-LD" ficaram vazios, a "Mídia/Capa" ficou vazia. O seletor de status está vazio, e eu não consigo alterar para "EXPANDED", por exemplo.
+
 ### 5.1 Regerar campo individual
-- [ ] Clicar "Regerar" no campo Meta Description.
-- [ ] Aparece nova meta. Versão incrementa para v2 no Histórico.
-- [ ] **VersionDiff:** ir na aba Histórico, selecionar v1 → v2 — só mostra mudança em `metaDescription`.
+- [x] Clicar "Regerar" no campo Meta Description.
+- [x] Aparece nova meta. Versão incrementa para v2 no Histórico.
+- [x] **VersionDiff:** ir na aba Histórico, selecionar v1 → v2 — só mostra mudança em `metaDescription`.
+
+*Anotações:* Fiz a regeração do Meta description, mudou a versão no header, mas no histórico continua apenas 1. Voltei para a lista de Conteúdos e lá já consta v2, abrindo os detalhes aparece a mudança no histórico.
 
 **Voltar para `/ideias`** — a ideia agora aparece como EXPANDED.
 
@@ -212,19 +216,21 @@ Na página `/ideias`:
 ## 6. Workflow de Revisão `[ ]`
 
 ### 6.1 Fila de revisão
-- [ ] `/revisao` mostra o conteúdo expandido com badge EXPANDED.
-- [ ] Clicar **Aprovar**. Status muda para APPROVED. Card desaparece.
+- [x] `/revisao` mostra o conteúdo expandido com badge EXPANDED.
+- [x] Clicar **Aprovar**. Status muda para APPROVED. Card desaparece.
 
 ### 6.2 Transições inválidas (testar via UI)
-- [ ] Abrir `/conteudos/<id>`.
-- [ ] No dropdown "Mover status" tentar voltar para EXPANDED → erro 400 ("Invalid transition").
-- [ ] Tentar ir direto para PUBLISHED → funciona (ADMIN tem permissão).
+- [x] Abrir `/conteudos/<id>`.
+- [?] No dropdown "Mover status" tentar voltar para EXPANDED → erro 400 ("Invalid transition").
+- [x] Tentar ir direto para PUBLISHED → funciona (ADMIN tem permissão).
+
+*Anotações:* O seletor de status está estranho, eu consigo selecionar algum status mas não tem nenhum feedback, nenhum toast, o dropdown não muda, fica sempre "Mover status...".
 
 ### 6.3 Despublicar
-- [ ] Mover status para UNPUBLISHED.
-- [ ] Acessar `http://localhost:3333/public/health-voice/contents/<slug>` → **410 Gone**.
-- [ ] Voltar para PUBLISHED via dropdown (UNPUBLISHED → PUBLISHED é permitido só para ADMIN).
-- [ ] Endpoint volta a retornar 200.
+- [x] Mover status para UNPUBLISHED.
+- [x] Acessar `http://localhost:3333/public/health-voice/contents/<slug>` → **410 Gone**.
+- [x] Voltar para PUBLISHED via dropdown (UNPUBLISHED → PUBLISHED é permitido só para ADMIN).
+- [x] Endpoint volta a retornar 200.
 
 ---
 

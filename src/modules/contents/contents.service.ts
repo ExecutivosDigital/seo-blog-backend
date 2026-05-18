@@ -193,10 +193,14 @@ export class ContentsService {
       );
     }
 
+    // Increment version a cada transição. Caso contrário, criar o snapshot
+    // com a mesma version de uma save/regenerate anterior viola o unique
+    // (contentId, version).
     const updated = await this.prisma.content.update({
       where: { id },
       data: {
         status: to,
+        version: { increment: 1 },
         ...(to === 'PUBLISHED' ? { publishedAt: new Date() } : {}),
       },
       include: FULL_INCLUDE,
@@ -207,7 +211,7 @@ export class ContentsService {
           contentId: id,
           version: updated.version,
           createdBy: userId ?? null,
-          snapshot: { transitionTo: to } as object,
+          snapshot: { transitionTo: to, status: to } as object,
         },
       })
       .catch(() => undefined);
