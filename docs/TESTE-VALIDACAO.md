@@ -7,9 +7,9 @@
 
 ## 0. Pré-requisitos `[ ]`
 
-- [ ] Docker Desktop rodando.
-- [ ] Portas livres: **3000** (admin), **3001** (LP), **3333** (API), **5432** (Postgres), **6379** (Redis).
-- [ ] Você tem a chave do OpenRouter em `seo-blog-backend/.env` (`OPEN_ROUTER_KEY=sk-or-v1-...`).
+- [x] Docker Desktop rodando.
+- [x] Portas livres: **3000** (admin), **3001** (LP), **3333** (API), **5432** (Postgres), **6379** (Redis).
+- [x] Você tem a chave do OpenRouter em `seo-blog-backend/.env` (`OPEN_ROUTER_KEY=sk-or-v1-...`).
 
 ### 0.1 Subir tudo
 
@@ -45,46 +45,48 @@ npm run dev
 ```
 
 **Validar:**
-- [ ] `curl http://localhost:3333/health` retorna `{"status":"ok","services":{"db":"up"}}`.
-- [ ] http://localhost:3000 carrega.
-- [ ] http://localhost:3001 carrega (LP, opcional).
+- [x] `curl http://localhost:3333/health` retorna `{"status":"ok","services":{"db":"up"}}`.
+- [x] http://localhost:3000 carrega.
+- [x] http://localhost:3001 carrega (LP, opcional).
 
 ---
 
 ## 1. Auth + Navegação `[ ]`
 
-- [ ] Acessar http://localhost:3000 → redireciona para `/login`.
-- [ ] Login com `admin@seoblog.local` / `123456` → redireciona para `/dashboard`.
-- [ ] **Dashboard** mostra cards zerados/baixos (nenhum conteúdo ainda).
-- [ ] Sidebar tem 11 itens: Dashboard, Ideias, Conteúdos, Revisão, Calendário, Publicações, Prompts, Custos IA, Sites, Tipos de Conteúdo, Usuários.
-- [ ] **SiteSwitcher** no topbar mostra "Health Voice".
-- [ ] Logout → volta pra `/login`.
-- [ ] Login com senha errada → mensagem de erro, **não** muda página.
+- [x] Acessar http://localhost:3000 → redireciona para `/login`.
+- [x] Login com `admin@seoblog.local` / `123456` → redireciona para `/dashboard`.
+- [x] **Dashboard** mostra cards zerados/baixos (nenhum conteúdo ainda).
+- [x] Sidebar tem 11 itens: Dashboard, Ideias, Conteúdos, Revisão, Calendário, Publicações, Prompts, Custos IA, Sites, Tipos de Conteúdo, Usuários.
+- [?] **SiteSwitcher** no topbar mostra "Health Voice".
+- [x] Logout → volta pra `/login`.
+- [x] Login com senha errada → mensagem de erro, **não** muda página.
+
+*Anotações:* Eu realizei o primeiro login e estava tudo zerado, e também sem o site switcher no header; ao atualizar a página, o seletor apareceu com Health Voice selecionado e alguns dados preenchidos dos testes automatizados realizados acredito.
 
 ### 1.1 Rate limit no login
 
-- [ ] Tente fazer login com senha errada **6 vezes seguidas** rapidamente.
-- [ ] **6ª tentativa retorna erro 429 (Too Many Requests)**. Esperar 1min libera.
+- [x] Tente fazer login com senha errada **6 vezes seguidas** rapidamente.
+- [x] **6ª tentativa retorna erro 429 (Too Many Requests)**. Esperar 1min libera.
 
 ---
 
 ## 2. Sites & Configurações `[ ]`
 
 ### 2.1 Listar
-- [ ] `/sites` mostra "Health Voice" com 2 content types.
-- [ ] `/content-types` mostra `Blog` (/blog) e `Notícia` (/noticias) ativos.
+- [x] `/sites` mostra "Health Voice" com 2 content types.
+- [x] `/content-types` mostra `Blog` (/blog) e `Notícia` (/noticias) ativos.
 
 ### 2.2 Criar
-- [ ] `/sites` → "Novo site" → preencher um teste (slug `teste-cms`, nome qualquer) → criar.
-- [ ] Aparece na lista. **SiteSwitcher** mostra opção do novo site.
-- [ ] Trocar para o site teste no switcher → `/content-types` fica vazio.
-- [ ] Voltar para Health Voice e **deletar** o site teste.
+- [x] `/sites` → "Novo site" → preencher um teste (slug `teste-cms`, nome qualquer) → criar.
+- [x] Aparece na lista. **SiteSwitcher** mostra opção do novo site.
+- [x] Trocar para o site teste no switcher → `/content-types` fica vazio.
+- [x] Voltar para Health Voice e **deletar** o site teste.
 
 ### 2.3 Usuários
-- [ ] `/users` lista 1 admin.
-- [ ] Criar um usuário EDITOR (email qualquer, senha 6 chars).
-- [ ] Logout, login como o novo EDITOR. `/users` **não aparece** na sidebar.
-- [ ] Voltar a logar como admin e deletar o EDITOR.
+- [x] `/users` lista 1 admin.
+- [x] Criar um usuário EDITOR (email qualquer, senha 6 chars).
+- [x] Logout, login como o novo EDITOR. `/users` **não aparece** na sidebar.
+- [x] Voltar a logar como admin e deletar o EDITOR.
 
 ---
 
@@ -102,10 +104,10 @@ Sintomas iniciais de diabetes tipo 2
 Prevenção de AVC após os 50
 Hipertensão arterial em idosos
 ```
-- [ ] Selecionar Content Type = Blog.
-- [ ] Pré-visualizar → tabela com 3 linhas editáveis.
-- [ ] Importar → alerta "3 ideias importadas".
-- [ ] Lista atualiza, todas com status **PENDING**.
+- [x] Selecionar Content Type = Blog.
+- [x] Pré-visualizar → tabela com 3 linhas editáveis.
+- [x] Importar → alerta "3 ideias importadas".
+- [x] Lista atualiza, todas com status **PENDING**.
 
 **Aba CSV** — colar:
 ```
@@ -113,8 +115,8 @@ title,briefing,keywords
 "Glicemia em jejum","O que é e como medir","glicemia;jejum;diabetes"
 "Colesterol LDL alto","Quando tratar","ldl;colesterol;cardiologia"
 ```
-- [ ] Pré-visualizar → 2 linhas com keywords parseadas.
-- [ ] Importar → 2 ideias novas.
+- [x] Pré-visualizar → 2 linhas com keywords parseadas.
+- [x] Importar → 2 ideias novas.
 
 **Aba JSON** — colar:
 ```json
@@ -122,7 +124,7 @@ title,briefing,keywords
   { "titleSeed": "Insônia em pacientes idosos", "briefing": "Causas e tratamento", "keywords": ["sono","idosos"] }
 ]
 ```
-- [ ] Importar → 1 ideia nova.
+- [x] Importar → 1 ideia nova.
 
 **Aba Markdown** — colar:
 ```
@@ -130,46 +132,52 @@ title,briefing,keywords
 * Burnout em médicos
 1. Telemedicina pós-pandemia
 ```
-- [ ] Importar → 3 ideias.
+- [x] Importar → 3 ideias.
+
+*Anotações:* A tabela de pré-visualização está muito pequena, os inputs de título só mostram 2 caracteres.
 
 **Total esperado: 9 ideias PENDING.**
 
 ### 3.2 Bulk actions
-- [ ] Selecionar 2 ideias via checkbox → ações em massa aparecem.
-- [ ] "Mudar status" → DISCARDED → 2 ideias agora DISCARDED. Filtrar por status confirma.
-- [ ] Apagar bulk de 1 ideia funciona.
+- [x] Selecionar 2 ideias via checkbox → ações em massa aparecem.
+- [x] "Mudar status" → DISCARDED → 2 ideias agora DISCARDED. Filtrar por status confirma.
+- [x] Apagar bulk de 1 ideia funciona.
 
 ### 3.3 Filtros e busca
-- [ ] Filtro status = PENDING mostra só pendentes.
-- [ ] Buscar "diabetes" filtra por título/briefing/keyword.
+- [x] Filtro status = PENDING mostra só pendentes.
+- [x] Buscar "diabetes" filtra por título/briefing/keyword.
 
 ---
 
 ## 4. Prompts & Playground `[ ]` ⚠️ ESSE COBRA
 
 ### 4.1 Listar
-- [ ] `/prompts` → vazia (Health Voice ainda sem prompts customizados — a IA usa defaults da casa).
+- [?] `/prompts` → vazia (Health Voice ainda sem prompts customizados — a IA usa defaults da casa).
+
+*Anotações:* Já possui um prompt para o campo "Título" com `google/gemini-2.5-flash`.
 
 ### 4.2 Criar um prompt
-- [ ] Clicar "Novo prompt":
+- [x] Clicar "Novo prompt":
   - Tipo: qualquer / Campo: TITLE / Modelo: `google/gemini-2.5-flash` / temp 0.5
   - System: "Você gera títulos curtos em pt-BR. SEM aspas."
-  - User: `Tema: {{titulo}}\nKeywords: {{keywords}}\nGere 1 título de até 60 caracteres.`
-- [ ] Salva. Aparece na tabela.
+  - User: `Tema: {{title}}\nKeywords: {{keywords}}\nGere 1 título de até 60 caracteres.`
+- [x] Salva. Aparece na tabela.
 
 ### 4.3 Playground (⚠️ **1 chamada paga — ~US$ 0,0001**)
-- [ ] Clicar ▶ no prompt.
-- [ ] Dialog detecta variáveis `titulo` e `keywords`, gera campos.
-- [ ] Preencher: titulo = "Pressão alta em idosos", keywords = "hipertensão, idosos".
-- [ ] Aviso amarelo de custo aparece.
-- [ ] Clicar **Rodar** → resposta em <5s.
-- [ ] Aparece: texto gerado, tokens in/out, custo, tempo.
-- [ ] Clicar **Rodar de novo** → aparece "HIT" no badge de cache, custo 0.
+- [x] Clicar ▶ no prompt.
+- [x] Dialog detecta variáveis `title` e `keywords`, gera campos.
+- [x] Preencher: title = "Pressão alta em idosos", keywords = "hipertensão, idosos".
+- [x] Aviso amarelo de custo aparece.
+- [x] Clicar **Rodar** → resposta em <5s.
+- [x] Aparece: texto gerado, tokens in/out, custo, tempo.
+- [x] Clicar **Rodar de novo** → aparece "HIT" no badge de cache, custo 0.
 
 ### 4.4 Custos
-- [ ] `/custos` mostra 1 chamada registrada.
-- [ ] Gráfico por dia mostra uma barra.
-- [ ] Botão **Download CSV** baixa `ai-cost-30d.csv` com 1+ linhas.
+- [?] `/custos` mostra 1 chamada registrada.
+- [x] Gráfico por dia mostra uma barra.
+- [x] Botão **Download CSV** baixa `ai-cost-30d.csv` com 1+ linhas.
+
+*Anotações:* Várias chamadas dos testes automatizados imagino.
 
 ---
 
@@ -177,10 +185,10 @@ title,briefing,keywords
 
 Na página `/ideias`:
 
-- [ ] Escolher uma ideia PENDING (ex.: "Hipertensão arterial em idosos").
-- [ ] Clicar ⚡ (Sparkles). Aparece alerta de confirmação com **estimativa de custo**.
-- [ ] Confirmar. Espera ~60–90s.
-- [ ] Redireciona automaticamente para `/conteudos/<id>` (editor).
+- [x] Escolher uma ideia PENDING (ex.: "Hipertensão arterial em idosos").
+- [x] Clicar ⚡ (Sparkles). Aparece alerta de confirmação com **estimativa de custo**.
+- [x] Confirmar. Espera ~60–90s.
+- [x] Redireciona automaticamente para `/conteudos/<id>` (editor).
 
 **Validar no editor:**
 - [ ] **Aba Conteúdo:** título reescrito, slug em kebab-case sem stopwords, corpo Markdown com >800 palavras (contador embaixo do textarea), botões "Regerar" por campo.
@@ -189,6 +197,8 @@ Na página `/ideias`:
 - [ ] **Aba Links Internos:** vazio agora (precisa de outros posts pra calcular).
 - [ ] **Aba Histórico:** 1 versão (v1) registrada. Mudou: `title, slug, bodyMd, …`.
 - [ ] Status do conteúdo = **EXPANDED**.
+
+*Anotações:* Vou parar aqui, pois criou-se um conteúdo com o título "Tema: Como criar um siteKeywords: site, criar, fazer, web, internet, onlineCrie seu site: Guia completo para iniciantes".
 
 ### 5.1 Regerar campo individual
 - [ ] Clicar "Regerar" no campo Meta Description.
