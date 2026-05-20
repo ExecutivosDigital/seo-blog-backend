@@ -35,6 +35,9 @@ export const envSchema = z.object({
   SEED_ADMIN_EMAIL: z.string().email().default('admin@seoblog.local'),
   SEED_ADMIN_PASSWORD: z.string().default('123456'),
   SEED_ADMIN_NAME: z.string().default('Admin'),
+
+  // Tracking hub (ver docs/tracking/) — salt para pseudonimizar IP. IP cru nunca é persistido.
+  TRACKING_IP_SALT: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

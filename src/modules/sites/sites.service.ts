@@ -38,6 +38,7 @@ export class SitesService {
         revalidateUrl: dto.revalidateUrl,
         revalidateSecret: dto.revalidateSecret,
         active: dto.active ?? true,
+        trackingEnabled: dto.trackingEnabled ?? false,
       },
     });
   }

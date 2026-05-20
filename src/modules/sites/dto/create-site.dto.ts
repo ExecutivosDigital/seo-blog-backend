@@ -76,4 +76,12 @@ export class CreateSiteDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Habilita ingestão de tracking deste site (ver docs/tracking/)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  trackingEnabled?: boolean;
 }

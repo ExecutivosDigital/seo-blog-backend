@@ -2,7 +2,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
-import { json, urlencoded } from 'express';
+import {
+  json,
+  text,
+  urlencoded,
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
@@ -22,6 +29,20 @@ async function bootstrap() {
 
   app.use(json({ limit: '20mb' }));
   app.use(urlencoded({ extended: true, limit: '20mb' }));
+
+  // Tracking hub: navigator.sendBeacon envia text/plain (sem preflight CORS).
+  // Parseia o corpo text/plain como JSON para os endpoints /tracking/*.
+  app.use(text({ type: ['text/plain'], limit: '64kb' }));
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (typeof req.body === 'string' && req.body.length > 0) {
+      try {
+        req.body = JSON.parse(req.body);
+      } catch {
+        // deixa como string — a validação do DTO rejeita com 400
+      }
+    }
+    next();
+  });
 
   const uploadsDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });

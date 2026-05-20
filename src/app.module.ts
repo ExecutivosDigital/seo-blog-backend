@@ -19,6 +19,7 @@ import { MediaModule } from './modules/media/media.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { PublishModule } from './modules/publish/publish.module';
 import { PublicModule } from './modules/public/public.module';
+import { TrackingModule } from './modules/tracking/tracking.module';
 import { ThrottlerModule } from './shared/throttler/throttler.module';
 
 @Module({
@@ -46,6 +47,7 @@ import { ThrottlerModule } from './shared/throttler/throttler.module';
     ScheduleModule,
     PublishModule,
     PublicModule,
+    TrackingModule,
   ],
 })
 export class AppModule {}
