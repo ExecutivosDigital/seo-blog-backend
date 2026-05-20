@@ -28,14 +28,29 @@ export function hashIp(ip: string | undefined, salt: string): string | undefined
   return createHash('sha256').update(`${ip}|${salt}`).digest('hex');
 }
 
+/**
+ * Normaliza telefone para apenas dígitos (R11). Cada LP manda o telefone com
+ * máscara própria; armazenar/comparar em forma canônica torna o dedup e o
+ * cruzamento de leads confiáveis. Ver docs/tracking/PONTOS-ATENCAO-TRACKING.md.
+ */
+export function normalizePhone(
+  phone: string | undefined | null,
+): string | undefined {
+  if (!phone) return undefined;
+  const digits = phone.replace(/\D/g, '');
+  return digits.length > 0 ? digits : undefined;
+}
+
 /** Hash de deduplicação de lead — janela curta evita lead duplicado por replay. */
 export function leadDedupeHash(
   siteId: string,
   email: string | undefined,
   phone: string | undefined,
 ): string {
+  const normEmail = (email ?? '').toLowerCase().trim();
+  const normPhone = normalizePhone(phone) ?? '';
   return createHash('sha256')
-    .update(`${siteId}|${(email ?? '').toLowerCase().trim()}|${(phone ?? '').trim()}`)
+    .update(`${siteId}|${normEmail}|${normPhone}`)
     .digest('hex');
 }
 

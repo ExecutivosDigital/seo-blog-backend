@@ -12,6 +12,7 @@ import {
   detectDeviceType,
   hashIp,
   leadDedupeHash,
+  normalizePhone,
 } from './tracking.util';
 
 /** Janela de deduplicação de lead — replay dentro desse intervalo reaproveita o lead. */
@@ -158,7 +159,7 @@ export class TrackingService {
         anonymousId: dto.anonymousId,
         name: dto.name,
         email: dto.email?.toLowerCase().trim(),
-        phone: dto.phone?.trim(),
+        phone: normalizePhone(dto.phone), // R11 — só dígitos
         source: dto.source,
         buttonId: dto.buttonId,
         destination: dto.destination,

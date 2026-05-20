@@ -138,7 +138,7 @@ async function main() {
               ev('lead_created', { properties: { leadId, source: 'campaing1' } });
               leads.push({
                 id: leadId, siteId, sessionId, anonymousId, name, email,
-                phone: `(41) 9${between(1000, 9999)}-${between(1000, 9999)}`,
+                phone: `419${between(1000, 9999)}${between(1000, 9999)}`, // dígitos (R11)
                 source: 'campaing1',
                 utmSource,
                 utmCampaign: utmSource ? 'campaing1' : null,
