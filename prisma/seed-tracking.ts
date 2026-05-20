@@ -152,6 +152,38 @@ async function main() {
         }
       }
     }
+
+    // ruído de bots/crawlers — o dashboard deve EXCLUÍ-los das métricas (DP6)
+    const botCount = between(2, 7);
+    for (let b = 0; b < botCount; b++) {
+      const startedAt = new Date(Date.now() - d * 86_400_000);
+      startedAt.setHours(between(0, 23), between(0, 59), 0, 0);
+      const sessionId = randomUUID();
+      const anonymousId = randomUUID();
+      sessions.push({
+        siteId, anonymousId, sessionId, startedAt,
+        lastSeenAt: new Date(startedAt.getTime() + between(1, 10) * 1000),
+        firstLandingPath: '/medical/campaing1',
+        userAgent: pick([
+          'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+          'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+        ]),
+        deviceType: 'desktop',
+        locale: 'en-US',
+        ipHash: createHash('sha256').update(`${sessionId}|seed`).digest('hex'),
+        country: 'US',
+        isBot: true,
+      });
+      for (let p = 0; p < between(1, 2); p++) {
+        events.push({
+          eventId: randomUUID(), siteId, sessionId, anonymousId,
+          name: 'page_view', path: '/medical/campaing1',
+          occurredAt: new Date(startedAt.getTime() + p * 1000),
+          schemaVersion: 1,
+          properties: { path: '/medical/campaing1', title: 'Health Voice' },
+        });
+      }
+    }
   }
 
   await chunkedCreate(sessions, (b) => prisma.trackingSession.createMany({ data: b }));
@@ -161,9 +193,10 @@ async function main() {
   await chunkedCreate(events, (b) => prisma.trackingEvent.createMany({ data: b }));
   await chunkedCreate(leads, (b) => prisma.trackingLead.createMany({ data: b }));
 
+  const bots = sessions.filter((s) => s.isBot).length;
   console.log(
-    `[seed-tracking] ${SITE_SLUG}: ${sessions.length} sessões, ${events.length} eventos, ` +
-      `${attributions.length} atribuições, ${leads.length} leads.`,
+    `[seed-tracking] ${SITE_SLUG}: ${sessions.length} sessões (${bots} bots), ` +
+      `${events.length} eventos, ${attributions.length} atribuições, ${leads.length} leads.`,
   );
 }
 

@@ -7,12 +7,26 @@ import { PrismaService } from '@/shared/database/prisma/prisma.service';
  * Toda agregação é feita no banco — o front recebe dado pronto.
  * Ver docs/tracking/ARQUITETURA-TRACKING.md §3.2 e §7.
  *
- * Nota v1: não filtra bots (`tracking_sessions.is_bot`). Decisão DP6 pendente —
- * ver docs/tracking/PONTOS-ATENCAO-TRACKING.md.
+ * Bots: sessões com `is_bot = true` (detectadas por User-Agent na ingestão)
+ * são EXCLUÍDAS de todas as agregações de sessão/evento. Leads não têm flag
+ * de bot — são mantidos (um bot não preenche formulário). Ver DP6 nos docs.
  */
 @Injectable()
 export class AnalyticsService {
   constructor(private prisma: PrismaService) {}
+
+  /** Filtro de site para SQL raw (`AND site_id = ...`). */
+  private siteSql(siteId?: string): Prisma.Sql {
+    return siteId ? Prisma.sql`AND site_id = ${siteId}::uuid` : Prisma.sql``;
+  }
+
+  /** Subquery: eventos só de sessões humanas (não-bot). */
+  private humanEvents(siteId?: string): Prisma.Sql {
+    return Prisma.sql`AND session_id IN (
+      SELECT session_id FROM tracking_sessions
+       WHERE is_bot = false ${this.siteSql(siteId)}
+    )`;
+  }
 
   /** Cards do overview — período atual + período anterior (para o ▲▼ %). */
   async overview(params: { siteId?: string; days?: number }) {
@@ -31,43 +45,48 @@ export class AnalyticsService {
 
   private async windowMetrics(siteId: string | undefined, from: Date, to: Date) {
     const siteFilter = siteId ? { siteId } : {};
-    const [sessions, pageViews, events, leads] = await Promise.all([
+    const site = this.siteSql(siteId);
+
+    const [sessions, leads, eventAgg] = await Promise.all([
       this.prisma.trackingSession.count({
-        where: { ...siteFilter, startedAt: { gte: from, lt: to } },
-      }),
-      this.prisma.trackingEvent.count({
-        where: { ...siteFilter, name: 'page_view', occurredAt: { gte: from, lt: to } },
-      }),
-      this.prisma.trackingEvent.count({
-        where: { ...siteFilter, occurredAt: { gte: from, lt: to } },
+        where: { ...siteFilter, isBot: false, startedAt: { gte: from, lt: to } },
       }),
       this.prisma.trackingLead.count({
         where: { ...siteFilter, createdAt: { gte: from, lt: to } },
       }),
+      this.prisma.$queryRaw<Array<{ page_views: bigint; events: bigint }>>`
+        SELECT
+          COUNT(*) FILTER (WHERE name = 'page_view')::bigint AS page_views,
+          COUNT(*)::bigint                                   AS events
+          FROM tracking_events
+         WHERE occurred_at >= ${from} AND occurred_at < ${to} ${site}
+           ${this.humanEvents(siteId)}`,
     ]);
+
+    const pageViews = Number(eventAgg[0]?.page_views ?? 0n);
+    const events = Number(eventAgg[0]?.events ?? 0n);
     const conversionRate =
       sessions > 0 ? Math.round((leads / sessions) * 10_000) / 100 : 0;
     return { sessions, pageViews, events, leads, conversionRate };
   }
 
-  /** Série diária de sessões, page views e leads. */
+  /** Série diária de sessões, page views e leads (sessões/eventos humanos). */
   async timeseries(params: { siteId?: string; days?: number }) {
     const days = params.days ?? 30;
     const since = new Date(Date.now() - days * 86_400_000);
-    const site = params.siteId
-      ? Prisma.sql`AND site_id = ${params.siteId}::uuid`
-      : Prisma.sql``;
+    const site = this.siteSql(params.siteId);
 
     const [sessions, pageViews, leads] = await Promise.all([
       this.prisma.$queryRaw<Array<{ day: Date; n: bigint }>>`
         SELECT date_trunc('day', started_at) AS day, COUNT(*)::bigint AS n
           FROM tracking_sessions
-         WHERE started_at >= ${since} ${site}
+         WHERE started_at >= ${since} AND is_bot = false ${site}
          GROUP BY 1 ORDER BY 1 ASC`,
       this.prisma.$queryRaw<Array<{ day: Date; n: bigint }>>`
         SELECT date_trunc('day', occurred_at) AS day, COUNT(*)::bigint AS n
           FROM tracking_events
          WHERE name = 'page_view' AND occurred_at >= ${since} ${site}
+           ${this.humanEvents(params.siteId)}
          GROUP BY 1 ORDER BY 1 ASC`,
       this.prisma.$queryRaw<Array<{ day: Date; n: bigint }>>`
         SELECT date_trunc('day', created_at) AS day, COUNT(*)::bigint AS n
@@ -97,17 +116,13 @@ export class AnalyticsService {
     };
   }
 
-  /** Funil de conversão: nº de sessões distintas que atingiram cada etapa. */
+  /** Funil de conversão: nº de sessões humanas distintas que atingiram cada etapa. */
   async funnel(params: { siteId?: string; days?: number }) {
     const days = params.days ?? 30;
     const since = new Date(Date.now() - days * 86_400_000);
-    const site = params.siteId
-      ? Prisma.sql`AND site_id = ${params.siteId}::uuid`
-      : Prisma.sql``;
+    const site = this.siteSql(params.siteId);
 
-    const [row] = await this.prisma.$queryRaw<
-      Array<Record<string, bigint>>
-    >`
+    const [row] = await this.prisma.$queryRaw<Array<Record<string, bigint>>>`
       SELECT
         COUNT(DISTINCT session_id) FILTER (WHERE name = 'page_view')    AS page_view,
         COUNT(DISTINCT session_id) FILTER (WHERE name = 'cta_click')    AS cta_click,
@@ -115,7 +130,8 @@ export class AnalyticsService {
         COUNT(DISTINCT session_id) FILTER (WHERE name = 'form_submit')  AS form_submit,
         COUNT(DISTINCT session_id) FILTER (WHERE name = 'lead_created') AS lead_created
         FROM tracking_events
-       WHERE occurred_at >= ${since} ${site}`;
+       WHERE occurred_at >= ${since} ${site}
+         ${this.humanEvents(params.siteId)}`;
 
     const defs: Array<{ key: string; label: string }> = [
       { key: 'page_view', label: 'Visitou a página' },
@@ -139,18 +155,22 @@ export class AnalyticsService {
     return { since, days, steps };
   }
 
-  /** Atribuição: sessões e leads por utm_source (com taxa de conversão). */
+  /** Atribuição: sessões humanas e leads por utm_source (com taxa de conversão). */
   async attribution(params: { siteId?: string; days?: number }) {
     const days = params.days ?? 30;
     const since = new Date(Date.now() - days * 86_400_000);
     const siteFilter = params.siteId ? { siteId: params.siteId } : {};
+    const siteOnS = params.siteId
+      ? Prisma.sql`AND s.site_id = ${params.siteId}::uuid`
+      : Prisma.sql``;
 
     const [sessionsBy, leadsBy] = await Promise.all([
-      this.prisma.trackingAttribution.groupBy({
-        by: ['utmSource'],
-        where: { ...siteFilter, createdAt: { gte: since } },
-        _count: true,
-      }),
+      this.prisma.$queryRaw<Array<{ source: string | null; n: bigint }>>`
+        SELECT a.utm_source AS source, COUNT(*)::bigint AS n
+          FROM tracking_attribution a
+          JOIN tracking_sessions s ON s.session_id = a.session_id
+         WHERE s.started_at >= ${since} AND s.is_bot = false ${siteOnS}
+         GROUP BY 1`,
       this.prisma.trackingLead.groupBy({
         by: ['utmSource'],
         where: { ...siteFilter, createdAt: { gte: since } },
@@ -164,7 +184,7 @@ export class AnalyticsService {
       if (!rows.has(key)) rows.set(key, { source: key, sessions: 0, leads: 0 });
       return rows.get(key)!;
     };
-    for (const s of sessionsBy) row(s.utmSource).sessions = s._count;
+    for (const s of sessionsBy) row(s.source).sessions = Number(s.n);
     for (const l of leadsBy) row(l.utmSource).leads = l._count;
 
     const bySource = [...rows.values()]
